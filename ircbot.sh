@@ -1,0 +1,139 @@
+#! /usr/bin/env bash
+# Copyright 2016 prussian <generalunrest@airmail.cc>
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+[ -d "/tmp/irc-bash" ] && rm -r /tmp/irc-bash
+infile="/tmp/irc-bash/in"
+outfile="/tmp/irc-bash/out"
+mkdir /tmp/irc-bash
+mkfifo $infile
+mkfifo $outfile
+
+function quit_prg {
+	pkill -P $$
+	rm -r /tmp/irc-bash
+	exec 3>&-
+	exit
+}
+
+function usage {
+	echo "$0 -n nickname [-s server] [-p port] [-t]"
+	echo "  -n --nick    user's nickname"
+	echo "  -s --server  the server to connect to (default, rizon)"
+	echo "  -p --port    port number to use (default, 6667)"
+	echo "  -t --tls     enable tls connection (default, off)"
+	echo "     --ssl     same as -t"
+	quit_prg
+}
+
+trap 'quit_prg' SIGINT SIGHUP SIGTERM
+
+TLS=0
+SERVER='irc.rizon.net'
+PORT='6667'
+NICK=''
+
+if [ -z "`which ncat 2>/dev/null`" ]; then
+	echo "install ncat, should come with nmap"
+	quit_prg
+fi
+
+while [[ $# > 1 ]]; do
+	key="$1"
+
+	case $key in
+		--tls|--ssl|-t)
+			TLS="--ssl"
+		;;
+		-s|--server)
+			SERVER="$2"
+			shift
+		;;
+		-p|--port)
+			PORT="$2"
+			shift
+		;;
+		-n|--nick)
+			NICK="$2"
+			shift
+		;;	
+		*)
+			usage
+		;;
+	esac
+	shift
+done
+
+if [ -z "$NICK" ]; then
+	usage
+fi
+
+function usage_in {
+	echo "ERROR: invalid command"
+	echo "ERROR: :j #chan         - join a channel"
+	echo "ERROR: :m #chan message - send message to channel"
+	echo "ERROR: :c to TYPE other - send ctcp's"
+	echo "ERROR: :r anything      - send raw irc command"
+	echo "ERROR: :q               - quit"
+}
+
+ncat $SERVER $PORT $TLS < $infile > $outfile &
+exec 3> $infile
+echo "NICK $NICK" >&3
+echo "USER $NICK +i * :$NICK" >&3
+
+while read -r command arg other; do
+	case $command in
+		:j|:join)
+			echo "JOIN $arg" >&3
+		;;
+		:m|:message)
+			echo "PRIVMSG $arg :$other" >&3
+		;;
+		:c|:ctcp)
+			echo "CTCP $arg :$other" >&3
+		;;
+		:q|:quit)
+			echo "QUIT :goodbye" >&3
+			quit_prg
+		;;
+		:r|:raw)
+			echo "$arg $other" >&3
+		;;
+		*)
+			usage_in
+		;;
+	esac
+done < /dev/stdin &
+
+while read -r user command channel message; do
+	user=`sed 's/^:\(.*\)!.*/\1/' <<< "$user"`
+	datetime=`date +"%Y-%m-%d %H:%M:%S"`
+	message=`sed 's/^://' <<< "$message"`
+	if [ "$user" = "PING" ]; then
+		echo "PONG $command" >&3
+		continue
+	fi
+	case $command in
+		PRIVMSG)
+			echo "$channel * $datetime <$user> $message"
+		;;
+		JOIN)
+			echo "$channel * $datetime <$user> ***HAS JOINED***"
+		;;
+		372)
+			echo "***MOTD*** $message"
+		;;
+	esac
+done < $outfile
