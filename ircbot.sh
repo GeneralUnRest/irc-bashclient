@@ -49,10 +49,8 @@ if [ -z "`which ncat 2>/dev/null`" ]; then
 	quit_prg
 fi
 
-while [[ $# > 1 ]]; do
-	key="$1"
-
-	case $key in
+while [ $# -ge 1 ]; do
+	case "$1" in
 		--tls|--ssl|-t)
 			TLS="--ssl"
 		;;
