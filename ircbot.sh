@@ -39,10 +39,10 @@ function usage {
 
 trap 'quit_prg' SIGINT SIGHUP SIGTERM
 
-TLS=0
+TLS=
 SERVER='irc.rizon.net'
 PORT='6667'
-NICK=''
+NICK=
 
 if [ -z "`which ncat 2>/dev/null`" ]; then
 	echo "install ncat, should come with nmap"
