@@ -49,7 +49,7 @@ if [ -z "`which ncat 2>/dev/null`" ]; then
 	quit_prg
 fi
 
-while [ $# -ge 1 ]; do
+while [ $# -gt 0 ]; do
 	case "$1" in
 		--tls|--ssl|-t)
 			TLS="--ssl"
@@ -91,7 +91,7 @@ exec 3> $infile
 echo "NICK $NICK" >&3
 echo "USER $NICK +i * :$NICK" >&3
 
-while read -r command arg other; do
+while read -e -r command arg other; do
 	case $command in
 		:j|:join)
 			echo "JOIN $arg" >&3
