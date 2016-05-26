@@ -88,12 +88,12 @@ if [ -z "$NICK" ]; then
 fi
 
 function usage_in {
-	echo "ERROR: invalid command"
-	echo "ERROR: :j #chan         - join a channel"
-	echo "ERROR: :m #chan message - send message to channel"
-	echo "ERROR: :c to TYPE other - send ctcp's"
-	echo "ERROR: :r anything      - send raw irc command"
-	echo "ERROR: :q               - quit"
+	echo "***ERROR*** invalid command"
+	echo "***ERROR*** :j #chan         - join a channel"
+	echo "***ERROR*** :l #chan [msg]   - leave a channel"
+	echo "***ERROR*** :m #chan message - send message to channel"
+	echo "***ERROR*** :r anything      - send raw irc command"
+	echo "***ERROR*** :q [msg]         - quit"
 }
 
 ncat $SERVER $PORT $TLS < $infile > $outfile &
@@ -113,7 +113,7 @@ while read -e -r command arg other; do
 			echo "PRIVMSG $arg :$other" >&3
 		;;
 		:q|:quit)
-			echo "QUIT :$other" >&3
+			echo "QUIT :$arg $other" >&3
 			quit_prg
 		;;
 		:r|:raw)
