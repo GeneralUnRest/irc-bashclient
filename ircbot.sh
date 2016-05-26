@@ -28,12 +28,14 @@ function quit_prg {
 }
 
 function usage {
-	echo "$0 -n nickname [-s server] [-p port] [-t]"
+	echo "$0 -n nickname [-s server] [-p port] [-t] [-q] [-j]"
 	echo "  -n --nick    user's nickname"
 	echo "  -s --server  the server to connect to (default, rizon)"
 	echo "  -p --port    port number to use (default, 6667)"
 	echo "  -t --tls     enable tls connection (default, off)"
 	echo "     --ssl     same as -t"
+	echo "  -q --quiet   remove error and motd messages"
+	echo "  -j --hide-joins"
 	quit_prg
 }
 
@@ -43,6 +45,8 @@ TLS=
 SERVER='irc.rizon.net'
 PORT='6667'
 NICK=
+QUIET=
+HIDE_JOIN=
 
 if [ -z "`which ncat 2>/dev/null`" ]; then
 	echo "install ncat, should come with nmap"
@@ -65,7 +69,13 @@ while [ $# -gt 0 ]; do
 		-n|--nick)
 			NICK="$2"
 			shift
-		;;	
+		;;
+		-q|--quiet)
+			QUIET=a
+		;;
+		-j|--hide-joins)
+			HIDE_JOIN=a
+		;;
 		*)
 			usage
 		;;
@@ -96,14 +106,14 @@ while read -e -r command arg other; do
 		:j|:join)
 			echo "JOIN $arg" >&3
 		;;
+		:l|:leave)
+			echo "PART $arg :$other" >&3
+		;;
 		:m|:message)
 			echo "PRIVMSG $arg :$other" >&3
 		;;
-		:c|:ctcp)
-			echo "CTCP $arg :$other" >&3
-		;;
 		:q|:quit)
-			echo "QUIT :goodbye" >&3
+			echo "QUIT :$other" >&3
 			quit_prg
 		;;
 		:r|:raw)
@@ -116,22 +126,34 @@ while read -e -r command arg other; do
 done < /dev/stdin &
 
 while read -r user command channel message; do
-	user=`sed 's/^:\(.*\)!.*/\1/' <<< "$user"`
+	user=`sed 's/^:\([^!]*\).*/\1/' <<< "$user"`
 	datetime=`date +"%Y-%m-%d %H:%M:%S"`
 	message=`sed 's/^://' <<< "$message"`
+	# if ping request
 	if [ "$user" = "PING" ]; then
 		echo "PONG $command" >&3
 		continue
 	fi
+	# other
 	case $command in
 		PRIVMSG)
 			echo "$channel * $datetime <$user> $message"
 		;;
 		JOIN)
+			[ -n "$HIDE_JOIN" ] && continue
 			echo "$channel * $datetime <$user> ***HAS JOINED***"
 		;;
+		371)
+			[ -n "$QUIET" ] && continue
+			echo "***INFO*** $message"
+		;;
 		372)
+			[ -n "$QUIET" ] && continue
 			echo "***MOTD*** $message"
+		;;
+		40*)
+			[ -n "$QUIET" ] && continue
+			echo "***ERROR*** $message"
 		;;
 	esac
 done < $outfile
