@@ -24,6 +24,7 @@ function quit_prg {
 	pkill -P $$
 	rm -r /tmp/irc-bash
 	exec 3>&-
+	exec 4<&-
 	exit
 }
 
