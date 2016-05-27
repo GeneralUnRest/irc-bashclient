@@ -48,28 +48,17 @@ PORT='6667'
 NICK=
 QUIET=
 HIDE_JOIN=
-CLIENT=`which ncat 2>/dev/null`
 BASH_TCP=
 
-if [ -z "$CLIENT" ]; then
-	CLIENT=`which nc 2>/dev/null`
-	NOTLS=a
-	echo "ncat not found, using netcat (nc)." >&2
-	echo "TLS will be disabled." >&2
-fi
-
-if [ -z "$CLIENT" ]; then
-	echo "netcat was also not found." >&2
-	echo "falling back to bash builtin" >&2
+if [ -z "`which ncat 2>/dev/null`" ]; then
+	echo "WARN: ncat not found, TLS will not be enabled" >&2
 	BASH_TCP=a
 fi
 
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--tls|--ssl|-t)
-			if [ -z "$NOTLS" ]; then
-				TLS="--ssl"
-			fi
+			TLS="--ssl"
 		;;
 		-s|--server)
 			SERVER="$2"
@@ -114,7 +103,7 @@ function usage_in {
 }
 
 if [ -z "$BASH_TCP" ]; then
-	$CLIENT $SERVER $PORT $TLS < $infile > $outfile &
+	ncat $SERVER $PORT $TLS < $infile > $outfile &
 	exec 3> $infile
 	exec 4< $outfile
 else
