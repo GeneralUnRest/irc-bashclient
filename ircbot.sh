@@ -49,7 +49,7 @@ QUIET=
 HIDE_JOIN=
 
 if [ -z "`which ncat 2>/dev/null`" ]; then
-	echo "install ncat, should come with nmap"
+	echo "TLS IS DISABLED"
 	quit_prg
 fi
 
