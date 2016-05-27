@@ -29,12 +29,13 @@ function quit_prg {
 
 function usage {
 	echo "$0 -n nickname [-s server] [-p port] [-t] [-q] [-j]"
-	echo "  -n --nick    user's nickname"
-	echo "  -s --server  the server to connect to (default, rizon)"
-	echo "  -p --port    port number to use (default, 6667)"
-	echo "  -t --tls     enable tls connection (default, off)"
-	echo "     --ssl     same as -t"
-	echo "  -q --quiet   remove error and motd messages"
+	echo "  -n --nick     user's nickname"
+	echo "  -s --server   the server to connect to (default, rizon)"
+	echo "  -p --port     port number to use (default, 6667)"
+	echo "  -t --tls      enable tls connection (default, off)"
+	echo "     --ssl      same as -t"
+	echo "  -q --quiet    remove error and motd messages"
+	echo "  -b --bash-tcp use /dev/tcp instead of ncat"
 	echo "  -j --hide-joins"
 	quit_prg
 }
@@ -47,16 +48,28 @@ PORT='6667'
 NICK=
 QUIET=
 HIDE_JOIN=
+CLIENT=`which ncat 2>/dev/null`
+BASH_TCP=
 
-if [ -z "`which ncat 2>/dev/null`" ]; then
-	echo "TLS IS DISABLED"
-	quit_prg
+if [ -z "$CLIENT" ]; then
+	CLIENT=`which nc 2>/dev/null`
+	NOTLS=a
+	echo "ncat not found, using netcat (nc)." >&2
+	echo "TLS will be disabled." >&2
+fi
+
+if [ -z "$CLIENT" ]; then
+	echo "netcat was also not found." >&2
+	echo "falling back to bash builtin" >&2
+	BASH_TCP=a
 fi
 
 while [ $# -gt 0 ]; do
 	case "$1" in
 		--tls|--ssl|-t)
-			TLS="--ssl"
+			if [ -z "$NOTLS" ]; then
+				TLS="--ssl"
+			fi
 		;;
 		-s|--server)
 			SERVER="$2"
@@ -76,6 +89,9 @@ while [ $# -gt 0 ]; do
 		-j|--hide-joins)
 			HIDE_JOIN=a
 		;;
+		-b|--bash-tcp)
+			BASH_TCP=a
+		;;
 		*)
 			usage
 		;;
@@ -92,12 +108,20 @@ function usage_in {
 	echo "***ERROR*** :j #chan         - join a channel"
 	echo "***ERROR*** :l #chan [msg]   - leave a channel"
 	echo "***ERROR*** :m #chan message - send message to channel"
+	echo "***ERROR*** :n [nickname]    - set a new nickname"
 	echo "***ERROR*** :r anything      - send raw irc command"
 	echo "***ERROR*** :q [msg]         - quit"
 }
 
-ncat $SERVER $PORT $TLS < $infile > $outfile &
-exec 3> $infile
+if [ -z "$BASH_TCP" ]; then
+	$CLIENT $SERVER $PORT $TLS < $infile > $outfile &
+	exec 3> $infile
+	exec 4< $outfile
+else
+	infile="/dev/tcp/${SERVER}/${PORT}"
+	exec 3<> $infile
+	exec 4<&3
+fi
 echo "NICK $NICK" >&3
 echo "USER $NICK +i * :$NICK" >&3
 
@@ -111,6 +135,9 @@ while read -e -r command arg other; do
 		;;
 		:m|:message)
 			echo "PRIVMSG $arg :$other" >&3
+		;;
+		:n|:nick)
+			echo "NICK $arg" >&3
 		;;
 		:q|:quit)
 			echo "QUIT :$arg $other" >&3
@@ -156,4 +183,4 @@ while read -r user command channel message; do
 			echo "***ERROR*** $message"
 		;;
 	esac
-done < $outfile
+done <&4
