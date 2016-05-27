@@ -140,7 +140,7 @@ while read -e -r command arg other; do
 			usage_in
 		;;
 	esac
-done < /dev/stdin &
+done <&0 &
 
 while read -r user command channel message; do
 	user=`sed 's/^:\([^!]*\).*/\1/' <<< "$user"`
