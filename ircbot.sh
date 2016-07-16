@@ -22,10 +22,10 @@ mkfifo $outfile
 
 function quit_prg {
 	pkill -P $$
-	rm -r /tmp/irc-bash
 	exec 3>&-
-	exec 4<&-
-	exit
+	exec 4>&-
+	rm -rf /tmp/irc-bash
+	exit 0
 }
 
 function usage {
@@ -104,9 +104,9 @@ function usage_in {
 }
 
 if [ -z "$BASH_TCP" ]; then
-	ncat $SERVER $PORT $TLS < $infile > $outfile &
-	exec 3> $infile
-	exec 4< $outfile
+	exec 3<> $infile
+	exec 4<> $outfile
+	ncat $SERVER $PORT $TLS <&3 >&4 & 
 else
 	infile="/dev/tcp/${SERVER}/${PORT}"
 	exec 3<> $infile
