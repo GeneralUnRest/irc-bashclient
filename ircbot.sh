@@ -149,7 +149,7 @@ while read -e -r cmd arg other; do
         ;;
         :q|:quit)
             send_msg "QUIT :$arg $other"
-            break
+            kill -TERM $$
         ;;
         :r|:raw)
             send_msg "$arg $other"
